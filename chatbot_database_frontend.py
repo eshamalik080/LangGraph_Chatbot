@@ -79,7 +79,15 @@ if user_input:
         st.text(user_input)
 
     # Streaming Code just make changes in 
-    config = {'configurable': {'thread_id': st.session_state['thread']}}
+    #  config = {'configurable': {'thread_id': st.session_state['thread']}}
+    # tio implemet threads in langsmith we have changed our simple config to this config
+    config = {
+        'configurable': {'thread_id': st.session_state['thread']},
+        'metadata':{
+            'thread_id': st.session_state['thread']
+        },
+        'run_name': 'chat_turn'
+        }
 
     with st.chat_message('assistant'):
             ai_message = st.write_stream(
