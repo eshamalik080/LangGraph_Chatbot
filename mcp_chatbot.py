@@ -1,3 +1,7 @@
+# for mcp the library 
+# we are using only works with asyncio so first 
+# we make code asynchronous then we implement mcp
+#now we remove tool an write mcp client
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import BaseMessage, HumanMessage
 from typing import TypedDict, Annotated
@@ -10,6 +14,7 @@ from langchain_core.tools import tool
 import asyncio
 import requests
 import random
+from langchain_mcp_adapters.client import MultiServerMCPClient
 
 class ChatState(TypedDict):
     # BaseMessage means any tpe of message can exit in this list like it could be human, AI,system message
@@ -20,37 +25,29 @@ load_dotenv()
 llm = ChatGroq(model="openai/gpt-oss-120b")
 
 # ***********************************************************
-@tool
-def calculator(first_no: float, sec_no: float, operation: str)-> dict:
-    """
-    perform a basic operation on two numbers.
-    Supported operations: add, sub, div, mul"""
-
-    try:
-        if operation == 'add':
-            result = first_no + sec_no
-        elif operation == 'sub':
-            result = first_no - sec_no
-        elif operation == 'div':
-            if sec_no == 0:
-                return {'error': 'Division by zero is not allowed'}
-            result = first_no / sec_no
-        elif operation == 'mul':
-            result = first_no * sec_no
-        else:
-            return {'error': f'Unsupported operation {operation}'}
-
-        return {'first_num': first_no, 'sec_num': sec_no, 'operation': operation, 'result': result }
-    except Exception as e:
-        return {'error': str(e)}
+#mcp client for calculator tool
+client = MultiServerMCPClient(
+    {
+        # we can add more than 1 server
+        # stdio used for server which is on local machine and we  can have another server (remote)
+        'arith':{
+            "transport": 'stdio',
+            'command': 'python3',
+            'args': ['#server path where it is saved']
+        }
+    }
+)
 #********************************************************************************************
-tools = [calculator]
-
-llm_tools = llm.bind_tools(tools)
+    
 # ***********************************************************
 
 
-def build_graph():
+async def build_graph():
+
+    # fetch tools from server
+    tools = await client.get_tools()
+    print(tools)
+    llm_tools = llm.bind_tools(tools)
 
     async def chat_node(state: ChatState):
         """LLM node that may answer or requesta rool call"""
@@ -80,7 +77,7 @@ def build_graph():
 
 async def main():
 
-    chatbot = build_graph()
+    chatbot = await build_graph()
 
     result = await chatbot.ainvoke({'messages': [HumanMessage(content= "Find the modulus of 1232354 and 12 give answer like cricket commentor.")]})
 
